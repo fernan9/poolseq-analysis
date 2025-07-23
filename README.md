@@ -12,7 +12,8 @@ This directory has 25TB of space and will hold most data.
 `/project/nmte222_uksr/perezgalvez/01.RawData`
 
 However, the project should have the following structure:
-<pre><code>/project/nmte222_uksr/perezgalvez/poolseq_project/
+
+<pre><code>../poolseq_project/
 ├── 1_raw_data/ # Original FastQ files
 ├── 2_fastqc/ # Quality reports
 ├── 3_trimmed/ # Trimmed FastQ files
@@ -23,7 +24,9 @@ However, the project should have the following structure:
 ├── 00_scripts/ # SLURM scripts
 └── 000_logs/ # SLURM output logs
 </code></pre>
+Note: project was moved to a new location
 
+<pre><code>mv /project/nmte222_uksr/perezgalvez/poolseq_project /mnt/gpfs2_4m/scratch/frpe222/</code></pre>
 ## Data transfer
 Files were uploaded from Windows SCP. The original directory was organized by sequencing lane, each having an independent file per sequencing sense, was reorganized by extracting all *.fq.gz files into the project directory.
 
@@ -65,6 +68,9 @@ In order to run a script, use the following format from the working directory:
 
 `$ sbatch first_job.sh`
 
+To check the status of the current jobs, consult:
+
+`$ squeue -u frpe222`
 
 ## 1. Quality Control (FastQC)
 This initial step will provide information on the quality of the readings. In general, the sequencing was good in all cases.
@@ -80,9 +86,9 @@ Show here an example
 
 ## 2. Trimming (PoPoolation v1.2.2 script)
 
-The resequencing readings from the fastQC files must be preprocessed before aligning. This is done with the Popoolation pipeline script `trim-fastq-pl`
+The fastQ files must be preprocessed before aligning. This is done with the Popoolation pipeline script `trim-fastq.pl`. The equivalent script from the legacy 2023 script is `submit-frpe05.sh` and is located at the **2023_slurm_scripts** directory.
 
-- **Script**: `scripts/02_trimming.sh`
+- **Script**: `00_scripts/02_trimming.sh` and  `00_scripts/02_ungzipping.sh`
 - **Input**: Raw FastQ files
 - **Output**: Trimmed FastQ files in `3_trimmed/`
 - **Tools**: Popoolation trim pearl script
@@ -90,12 +96,23 @@ The resequencing readings from the fastQC files must be preprocessed before alig
   - --quality-threshold 20
   - --min-length 50
   - --fastq-type sanger
+  - --output1
+  - --output2
+  - --outputse
 
-### Script logic
-
-The idea is to process every file in `../1_rawdata` in the same script
+### UnGzipping files
+First the *.fq.gz files must be decompressed. The code below was applied as a slurm script named `02_ungzipping.sh`
+```
+cd /project/nmte222_uksr/perezgalvez/1_raw_data
+for f in *.fq.gz; do
+  gunzip -c "$f" > "${f%.gz}"
+done
+```
 
 ## 3. Alignment (BWA)
+
+Now, the alignment between the trimmed samples and the genome must be computed by pairs. The legacy script corresponds to XXX
+
 - **Script**: `scripts/03_alignment.sh`
 - **Input**: Trimmed FastQ files
 - **Output**: SAM files in `aligned/`
@@ -103,6 +120,40 @@ The idea is to process every file in `../1_rawdata` in the same script
 - **Parameters**:
   - Reference genome: `/path/to/reference_genome.fa`
   - Threads: 8
+
+first make an index from the genome reference with bwa index, only once
+
+```console
+singularity run --app bwa0717 /share/singularity/images/ccs/conda/amd-conda1-centos8.sinf bwa index /scratch/frpe222/Genome/dmel-short-header.fa
+```
+second align the trimmed files using bwa sampe, for each  trimmed pairedsample
+
+```python
+# forward
+singularity run --app bwa0717 \
+/share/singularity/images/ccs/conda/amd-conda1-centos8.sinf \
+bwa aln -t 8 -o 2 -d 12 -e 12 -l 100 -n 0.01 \
+/scratch/frpe222/Genome/dmel-short-header.fa /scratch/frpe222/Trim/A0_trimed_1 > /scratch/frpe222/Trim/A0_trimed_1.sai
+
+# reverse
+singularity run --app bwa0717 \
+/share/singularity/images/ccs/conda/amd-conda1-centos8.sinf \
+bwa aln -t 8 -o 2 -d 12 -e 12 -l 100 -n 0.01 \
+/scratch/frpe222/Genome/dmel-short-header.fa /scratch/frpe222/Trim/A0_trimed_2 > /scratch/frpe222/Trim/A0_trimed_2.sai
+
+# mapping to sam
+singularity run --app bwa0717 \
+/share/singularity/images/ccs/conda/amd-conda1-centos8.sinf \
+bwa sampe /scratch/frpe222/Genome/dmel-short-header.fa /scratch/frpe222/Trim/A0_trimed_1.sai /scratch/frpe222/Trim/A0_trimed_2.sai /scratch/frpe222/Trim/A0_trimed_1 /scratch/frpe222/Trim/A0_trimed_2 > /scratch/frpe222/Mapped/A0.sam
+
+# "bwa aln" specifies that the "aln" algorithm within the BWA software package should be used for read alignment.
+# "-t 8" specifies that the tool should use eight threads (i.e. eight CPU cores) for the alignment process, potentially speeding up the analysis if multiple cores are available.
+# "-o 2" specifies the maximum number of gap opens allowed in the alignment process. In this case, up to two gap opens are permitted.
+# "-d 12" specifies the maximum gap extension penalty that can be assigned in the alignment process.
+# "-e 12" specifies the maximum edit distance allowed between the read and the reference genome, in terms of the number of mismatches and gaps.
+# "-l 100" specifies the seed length used for the alignment process. In this case, a seed length of 100 base pairs is used.
+# "-n 0.01" specifies the maximum allowed mismatch rate between the read and the reference genome. In this case, a maximum mismatch rate of 0.01 (or 1%) is allowed.
+```
 
 ### 4. SAM to BAM Conversion
 - **Script**: `scripts/04_sam_to_bam.sh`
@@ -143,16 +194,7 @@ text
 
 ## Execution Instructions
 
-### Sequential Submission
 ```bash
-# Submit jobs with dependencies
-JOB1=$(sbatch scripts/01_fastqc.sh | awk '{print $4}')
-JOB2=$(sbatch --dependency=afterok:$JOB1 scripts/02_trimming.sh | awk '{print $4}')
-JOB3=$(sbatch --dependency=afterok:$JOB2 scripts/03_alignment.sh | awk '{print $4}')
-JOB4=$(sbatch --dependency=afterok:$JOB3 scripts/04_sam_to_bam.sh | awk '{print $4}')
-JOB5=$(sbatch --dependency=afterok:$JOB4 scripts/05_sort_index.sh | awk '{print $4}')
-JOB6=$(sbatch --dependency=afterok:$JOB5 scripts/06_pileup.sh | awk '{print $4}')
-JOB7=$(sbatch --dependency=afterok:$JOB6 scripts/07_variant_calling.sh | awk '{print $4}')
 Monitoring Jobs
 bash
 squeue -u $USER          # View your running jobs
@@ -179,7 +221,7 @@ SAMtools
 VarScan
 
 Version History
-2023-11-20: Initial pipeline setup
+2025-07-23: Initial pipeline setup
 
 Notes
 Adjust memory/time requirements in SLURM scripts based on your dataset size
@@ -187,18 +229,3 @@ Adjust memory/time requirements in SLURM scripts based on your dataset size
 Check intermediate files at each step before proceeding
 
 Consider adding steps for coverage analysis if needed
-
-text
-
-This README provides:
-1. A clear roadmap of your analysis
-2. Documentation of parameters and tools
-3. Execution instructions
-4. PoolSeq-specific considerations
-5. Version tracking
-
-You can extend this with:
-- Specific sample information
-- Custom parameters you used
-- Any troubleshooting notes
-- References to important papers or methods

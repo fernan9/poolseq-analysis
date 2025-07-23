@@ -13,8 +13,8 @@ module load ccs/singularity
 # singularity run /share/singularity/images/ccs/popoolation/lcc-popoolation-ubuntu2204.sinf perl /opt/popoolation/basic-pipeline/identify-genomic-indel-regions.pl
 
 # Directories
-INPUT_DIR="/project/nmte222_uksr/perezgalvez/poolseq_project/1_raw_data"
-OUTPUT_DIR="/project/nmte222_uksr/perezgalvez/poolseq_project/3_trimmed"
+INPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/1_raw_data"
+OUTPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/3_trimmed"
 CONTAINER="/share/singularity/images/ccs/popoolation/lcc-popoolation-ubuntu2204.sinf"
 SCRIPT="/opt/popoolation/basic-pipeline/trim-fastq.pl"
 

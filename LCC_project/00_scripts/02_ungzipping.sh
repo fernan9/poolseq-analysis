@@ -9,7 +9,7 @@
 #SBATCH --mail-type ALL       
 #SBATCH --mail-user fr_perezgalvez@outlook.com
 
-INPUT_DIR="/project/nmte222_uksr/perezgalvez/poolseq_project/1_raw_data"
+INPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/1_raw_data"
 
 
 cd "$INPUT_DIR"
