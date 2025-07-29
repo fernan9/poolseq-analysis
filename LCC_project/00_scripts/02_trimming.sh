@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --time=24:00:00  
+#SBATCH --time=6:00:00  
 #SBATCH --job-name=02_trimming
 #SBATCH --ntasks=1 
-#SBATCH --partition=SKY32M192_L 
+#SBATCH --partition=CAL48M192_L 
 #SBATCH --error=000_logs/02_trimming_%j.err 
 #SBATCH --output=000_logs/02_trimming_%j.out 
 #SBATCH --account=col_nmte222_uksr  
@@ -24,6 +24,15 @@ FILES=($(ls ${INPUT_DIR}/*_1.fq | sort))
 for FILE1 in "${FILES[@]}"; do
     FILE2="${FILE1/_1.fq/_2.fq}"
     BASENAME=$(basename "$FILE1" | sed 's/_L[0-9]*_1.fq//')
+    OUTPUT1="${OUTPUT_DIR}/${BASENAME}_R1.trimmed.fq"
+
+    if [[ -f "${OUTPUT1}.gz" ]]; then
+        echo "Skipping $BASENAME --- already trimmed"
+        continue
+    else
+        echo "Trimming $BASENAME --- missng file"
+        #continue
+    fi
 
     echo "Trimming $BASENAME"
     singularity run "$CONTAINER" perl "$SCRIPT" \
