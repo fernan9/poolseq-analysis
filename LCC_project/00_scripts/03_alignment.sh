@@ -18,7 +18,7 @@ INPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/3_trimmed"
 OUTPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/4_aligned"
 CONTAINER="/share/singularity/images/ccs/conda/lcc-conda-2-centos8.sinf"
 GENOME="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/0_genome/dmel_r6C.fasta"
-OUTPUT_FILE="${OUTPUT_DIR}/${BASENAME}.sam"
+
 # Get file list of all _1.fq files
 FILES=($(ls ${INPUT_DIR}/*_R1.trimmed.fq.gz | sort))
 
@@ -27,7 +27,8 @@ for FILE1 in "${FILES[@]}"; do
     BASENAME=$(basename "$FILE1" | sed 's/_R1\.trimmed\.fq\.gz$//')
     ALIGNMENT_FILE1="${OUTPUT_DIR}/${BASENAME}_R1.sai"
     ALIGNMENT_FILE2="${OUTPUT_DIR}/${BASENAME}_R2.sai"
-
+    OUTPUT_FILE="${OUTPUT_DIR}/${BASENAME}.sam"
+    
     # check for paired file
     if [[ ! -f "$FILE2" ]]; then
         echo "Error: Paired file $FILE2 missing!" >&2

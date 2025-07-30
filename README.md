@@ -115,7 +115,7 @@ Now, the alignment between the trimmed samples and the genome must be computed b
 
 - **Script**: `scripts/03_alignment.sh`
 - **Input**: Trimmed FastQ files
-- **Output**: SAM files in `aligned/`
+- **Output**: SAM files in `4_aligned/`
 - **Tools**: BWA (aln + sampe)
 - **Parameters**:
   - Reference genome: `/path/to/reference_genome.fa`
@@ -126,7 +126,130 @@ first make an index from the genome reference with bwa index, only once
 ```console
 singularity run --app bwa0717 /share/singularity/images/ccs/conda/amd-conda1-centos8.sinf bwa index /scratch/frpe222/Genome/dmel-short-header.fa
 ```
-second align the trimmed files using bwa sampe, for each  trimmed pairedsample
+second align the trimmed files using bwa sampe, for each  trimmed pairedsample. In the case of Poolseq data, cetrtain parameters must be benchmarked to optimize variant call. This will be made by doing a benchmark for two file sets, one from B2 and one from P3.
+
+PoolSeq Alignment Benchmarking Guide
+
+Optimizing bwa aln Parameters for Illumina Resequencing Data
+
+1. Goals
+Accuracy: Minimize false positives in variant calls.
+
+Sensitivity: Detect low-frequency alleles in pooled samples.
+
+Reproducibility: Consistent performance across replicates.
+
+2. Test Dataset Preparation
+```bash
+# Extract 1M reads (250K pairs) for quick testing  
+zcat ${INPUT_DIR}/sample_R1.trimmed.fq.gz | head -n 1000000 > test_R1.fq  
+zcat ${INPUT_DIR}/sample_R2.trimmed.fq.gz | head -n 1000000 > test_R2.fq  
+```
+3. Parameter Comparison
+
+A. Run Alignments
+```bash
+# Strict (conservative)  
+singularity exec $CONTAINER bwa aln -n 0.01 -o 1 -e 3 -l 32 $GENOME test_R1.fq > strict_R1.sai  
+
+# Adjusted (recommended for PoolSeq)  
+singularity exec $CONTAINER bwa aln -n 0.02 -o 1 -e 5 -l 32 $GENOME test_R1.fq > adjusted_R1.sai  
+
+# Permissive (default-like)  
+singularity exec $CONTAINER bwa aln -n 0.04 -o 2 -e 7 -l 100 $GENOME test_R1.fq > permissive_R1.sai  
+```
+B. Generate SAM Files
+```bash
+for prefix in strict adjusted permissive; do  
+  singularity exec $CONTAINER bwa sampe $GENOME ${prefix}_R1.sai ${prefix}_R2.sai \  
+    test_R1.fq test_R2.fq > ${prefix}.sam  
+done  
+```
+4. Key Metrics
+
+A. Alignment Statistics
+```bash
+for sam in *.sam; do  
+  echo "===== $sam ====="  
+  samtools flagstat $sam  
+  echo "Mapped reads: $(grep -c '^[^@]' $sam)"  
+done  
+Target: >90% mapping rate.
+```
+B. Depth Distribution
+```bash
+for sam in *.sam; do  
+  samtools view -b $sam | samtools depth - | awk '{sum+=$3} END {print "Mean depth:", sum/NR}'  
+done  
+```
+C. SNP Recovery (vs. Known Variants)
+```bash
+for sam in *.sam; do  
+  bcftools mpileup -f $GENOME $sam | bcftools call -mv -Ov -o ${sam%.sam}.vcf  
+  echo "SNPs in ${sam%.sam}.vcf: $(grep -vc '^#' ${sam%.sam}.vcf)"  
+done  
+```
+Expected: Adjusted parameters recover ≥95% known SNPs (e.g., FlyBase variants).
+
+5. Visual Comparison
+
+
+Example Output Table
+
+|Parameters	|Mapped Rate	|Mean Depth	|SNPs Detected|
+|-----------|-------------|-----------|-------------|
+|Strict	    |88%          |	45X       |	9,201       |
+|Adjusted   |	93%	        |48X	      |9,812        |
+|Permissive	|95%	        |49X	      |10,305 (12% FPs)|
+
+
+Plotting (R/Python)
+```r
+# R example (ggplot2)  
+library(ggplot2)  
+data <- read.table("stats.tsv", header=TRUE)  
+ggplot(data, aes(x=Parameters, y=MappedRate)) + geom_bar(stat="identity")
+```  
+6. Automation Script
+Save as benchmark.sh:
+
+```bash
+#!/bin/bash  
+#SBATCH --job-name=alignment_benchmark  
+#SBATCH --time=2:00:00  
+#SBATCH --cpus-per-task=8  
+
+declare -A PARAMS=(  
+  ["strict"]="-n 0.01 -o 1 -e 3 -l 32"  
+  ["adjusted"]="-n 0.02 -o 1 -e 5 -l 32"  
+  ["permissive"]="-n 0.04 -o 2 -e 7 -l 100"  
+)  
+
+for prefix in "${!PARAMS[@]}"; do  
+  singularity exec $CONTAINER bwa aln ${PARAMS[$prefix]} $GENOME test_R1.fq > ${prefix}_R1.sai  
+  singularity exec $CONTAINER bwa sampe $GENOME ${prefix}_R1.sai ${prefix}_R2.sai test_R1.fq test_R2.fq > ${prefix}.sam  
+done  
+```
+
+7. Final Recommendations
+PoolSeq Priority: Favor specificity (low false positives) over sensitivity.
+
+Validation:
+
+Check allele frequencies at known loci.
+
+Compare to GATK’s MarkDuplicates if PCR duplicates are a concern.
+
+Citation:
+
+bibtex
+@article{kofler2016toolkit,
+  title={Toolkit for PoolSeq analysis},
+  author={Kofler, Robert and Schlötterer, Christian},
+  journal={Genetics},
+  year={2016}
+}
+
 
 ```python
 # forward
