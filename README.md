@@ -14,6 +14,7 @@ This directory has 25TB of space and will hold most data.
 However, the project should have the following structure:
 
 <pre><code>../poolseq_project/
+├── 0_genome/ # Genome file for Index
 ├── 1_raw_data/ # Original FastQ files
 ├── 2_fastqc/ # Quality reports
 ├── 3_trimmed/ # Trimmed FastQ files
@@ -111,172 +112,78 @@ done
 
 ## 3. Alignment (BWA)
 
-Now, the alignment between the trimmed samples and the genome must be computed by pairs. The legacy script corresponds to XXX
+The objective is to call SNP variants from aligned data. Alignment between the trimmed samples and the genome must be computed by pairs and requires previous indexing for the genome. The parameter used to align the resequencing data must be benchmarked to select a balance between precision and speed. Because in pool-seq approahces all the variants come from within the sample, the selection of variants has to be conservative.
 
-- **Script**: `scripts/03_alignment.sh`
+- **Script**: `scripts/03_index.sh`
+              `scripts/03_alignment.sh`
+              `scripts/03_benchmarking.sh`
+              `scripts/03_benchmarking_analysis.sh`
 - **Input**: Trimmed FastQ files
-- **Output**: SAM files in `4_aligned/`
+- **Output**: SAM, BAM, VCF files in `4_aligned/`
 - **Tools**: BWA (aln + sampe)
 - **Parameters**:
   - Reference genome: `/path/to/reference_genome.fa`
   - Threads: 8
 
-first make an index from the genome reference with bwa index, only once
-
-```console
-singularity run --app bwa0717 /share/singularity/images/ccs/conda/amd-conda1-centos8.sinf bwa index /scratch/frpe222/Genome/dmel-short-header.fa
-```
-second align the trimmed files using bwa sampe, for each  trimmed pairedsample. In the case of Poolseq data, cetrtain parameters must be benchmarked to optimize variant call. This will be made by doing a benchmark for two file sets, one from B2 and one from P3.
-
-PoolSeq Alignment Benchmarking Guide
-
-Optimizing bwa aln Parameters for Illumina Resequencing Data
-
-1. Goals
-Accuracy: Minimize false positives in variant calls.
-
-Sensitivity: Detect low-frequency alleles in pooled samples.
-
-Reproducibility: Consistent performance across replicates.
-
-2. Test Dataset Preparation
-```bash
-# Extract 1M reads (250K pairs) for quick testing  
-zcat ${INPUT_DIR}/sample_R1.trimmed.fq.gz | head -n 1000000 > test_R1.fq  
-zcat ${INPUT_DIR}/sample_R2.trimmed.fq.gz | head -n 1000000 > test_R2.fq  
-```
-3. Parameter Comparison
-
-A. Run Alignments
-```bash
-# Strict (conservative)  
-singularity exec $CONTAINER bwa aln -n 0.01 -o 1 -e 3 -l 32 $GENOME test_R1.fq > strict_R1.sai  
-
-# Adjusted (recommended for PoolSeq)  
-singularity exec $CONTAINER bwa aln -n 0.02 -o 1 -e 5 -l 32 $GENOME test_R1.fq > adjusted_R1.sai  
-
-# Permissive (default-like)  
-singularity exec $CONTAINER bwa aln -n 0.04 -o 2 -e 7 -l 100 $GENOME test_R1.fq > permissive_R1.sai  
-```
-B. Generate SAM Files
-```bash
-for prefix in strict adjusted permissive; do  
-  singularity exec $CONTAINER bwa sampe $GENOME ${prefix}_R1.sai ${prefix}_R2.sai \  
-    test_R1.fq test_R2.fq > ${prefix}.sam  
-done  
-```
-4. Key Metrics
-
-A. Alignment Statistics
-```bash
-for sam in *.sam; do  
-  echo "===== $sam ====="  
-  samtools flagstat $sam  
-  echo "Mapped reads: $(grep -c '^[^@]' $sam)"  
-done  
-Target: >90% mapping rate.
-```
-B. Depth Distribution
-```bash
-for sam in *.sam; do  
-  samtools view -b $sam | samtools depth - | awk '{sum+=$3} END {print "Mean depth:", sum/NR}'  
-done  
-```
-C. SNP Recovery (vs. Known Variants)
-```bash
-for sam in *.sam; do  
-  bcftools mpileup -f $GENOME $sam | bcftools call -mv -Ov -o ${sam%.sam}.vcf  
-  echo "SNPs in ${sam%.sam}.vcf: $(grep -vc '^#' ${sam%.sam}.vcf)"  
-done  
-```
-Expected: Adjusted parameters recover ≥95% known SNPs (e.g., FlyBase variants).
-
-5. Visual Comparison
-
-
-Example Output Table
-
-|Parameters	|Mapped Rate	|Mean Depth	|SNPs Detected|
-|-----------|-------------|-----------|-------------|
-|Strict	    |88%          |	45X       |	9,201       |
-|Adjusted   |	93%	        |48X	      |9,812        |
-|Permissive	|95%	        |49X	      |10,305 (12% FPs)|
-
-
-Plotting (R/Python)
-```r
-# R example (ggplot2)  
-library(ggplot2)  
-data <- read.table("stats.tsv", header=TRUE)  
-ggplot(data, aes(x=Parameters, y=MappedRate)) + geom_bar(stat="identity")
-```  
-6. Automation Script
-Save as benchmark.sh:
+### Reference Genome (Index)
+Firts, make an index from the genome reference with bwa index, only once. I used the release 6 from *Drosophila melanogaster* downloaded from flybase.
 
 ```bash
-#!/bin/bash  
-#SBATCH --job-name=alignment_benchmark  
-#SBATCH --time=2:00:00  
-#SBATCH --cpus-per-task=8  
+# Directories
+CONTAINER="/share/singularity/images/ccs/conda/lcc-conda-2-centos8.sinf"
+GENOME="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/0_genome/dmel_r6C.fasta"
 
-declare -A PARAMS=(  
-  ["strict"]="-n 0.01 -o 1 -e 3 -l 32"  
-  ["adjusted"]="-n 0.02 -o 1 -e 5 -l 32"  
-  ["permissive"]="-n 0.04 -o 2 -e 7 -l 100"  
-)  
-
-for prefix in "${!PARAMS[@]}"; do  
-  singularity exec $CONTAINER bwa aln ${PARAMS[$prefix]} $GENOME test_R1.fq > ${prefix}_R1.sai  
-  singularity exec $CONTAINER bwa sampe $GENOME ${prefix}_R1.sai ${prefix}_R2.sai test_R1.fq test_R2.fq > ${prefix}.sam  
-done  
+singularity run --app bwa0717 $CONTAINER bwa index $GENOME
 ```
+### Alignment Parameters
 
-7. Final Recommendations
-PoolSeq Priority: Favor specificity (low false positives) over sensitivity.
+Second, align the trimmed files using bwa aln and then producing the lignment SAM file with sampe, for each  trimmed paired sample. Below is a description of the parameters used in the legacy code.
 
-Validation:
+|Parameters	|Description			     			            |
+|-----------|---------------------------------------|
+|bwa aln	  |specifies that the "aln" algorithm      |
+|-t 8       | number of threads (i.e. eight CPU cores) for the alignment process, potentially speeding up the analysis.|
+|-o 2     	|maximum number of gap opens allowed in the alignment process.|
+|-d 12     	|maximum gap extension penalty that can be assigned in the alignment process.|
+|-e 12     	|maximum edit distance allowed between the read and the reference genome, in terms of the number of mismatches and gaps.|
+|-l 100     	|seed length used for the alignment process. In this case, a seed length of 100 base pairs is used.|
+|-n 0.01     	|maximum allowed mismatch rate between the read and the reference genome. In this case, 0.01 (or 1%) .|
 
-Check allele frequencies at known loci.
+### Bechmarking
+However, we want to know the influence of these parameters in variant calling and potentially biasing the analysis of poolseq. For example, by introducing variation by allowing too many gaps or variants in alignment. Favor specificity (low false positives) over sensitivity.
 
-Compare to GATK’s MarkDuplicates if PCR duplicates are a concern.
+Th goal with this benchmarking, then, is to minimize false positives in variant calls while detecting low-frequency alleles in pooled samples consistently across replicates.
 
-Citation:
+The alignment was conducted with three parameter sets (permissive, adjusted, strict) to evaluate characteristics on its performance.
 
-bibtex
-@article{kofler2016toolkit,
-  title={Toolkit for PoolSeq analysis},
-  author={Kofler, Robert and Schlötterer, Christian},
-  journal={Genetics},
-  year={2016}
-}
+|Parameters	|Permissive	  |Adjusted	  |Strict |
+|-----------|-------------|-----------|-------|
+|-n         |  0.04       |	0.02      |	0.01  |
+|-o         |	2	          |1	        |1      |
+|-e	        |7	          |5	        |3      |
+|-l	        |100	        |32	        |32     |
+
+Comparison between alignment was based on the performance metrics of `samtools flagstat` for alignment statistics, the mean depth distribution and the SNP recovery. The idea is to expect the adjested parameters to recover ≥95% known SNPs in comparison to knwon variants as those in FlyBase (but still a good metric has to be determined, specially because the two experiments are different in their expected genetic diversity).
+
+### Benchmarking results
+
+The sample run was B2a to create the SAM file.
 
 
-```python
-# forward
-singularity run --app bwa0717 \
-/share/singularity/images/ccs/conda/amd-conda1-centos8.sinf \
-bwa aln -t 8 -o 2 -d 12 -e 12 -l 100 -n 0.01 \
-/scratch/frpe222/Genome/dmel-short-header.fa /scratch/frpe222/Trim/A0_trimed_1 > /scratch/frpe222/Trim/A0_trimed_1.sai
+|Parameters	      |Permissive	  |Adjusted	  |Strict |
+|-----------------|-------------|-----------|-------|
+|Mapped rate      | 93.96%    |	96.22%    |	 96.28%  |
+|Singletons       |	1.15%      |	0.92%      | 0.91%   |
+|Properly Paired	|	91.74%     |	94.10%   |  94.16%   |
+|Read Depth	Mean  | 45.1183    |	46.2965   |   46.324   |
+|Read Depth (Std Dev)|(106.188)|	(109.861) |  (110.21) |
+|SNPs called	    |	1,197,475  |	1,244,337 | 1,244,103 |
 
-# reverse
-singularity run --app bwa0717 \
-/share/singularity/images/ccs/conda/amd-conda1-centos8.sinf \
-bwa aln -t 8 -o 2 -d 12 -e 12 -l 100 -n 0.01 \
-/scratch/frpe222/Genome/dmel-short-header.fa /scratch/frpe222/Trim/A0_trimed_2 > /scratch/frpe222/Trim/A0_trimed_2.sai
+One interesting observation is that the strict parameters calls a larger amount of SNPs as well as an increased mapping rate. One would expect that a permissive set of parameters would allow more SNPs to be read, but instead it appears that the contrary is true, perhaps by increasing ambiguity. This idea is reinforced by the increased amount of properly paired reads in strict and adjusted parameters while as well as the decreased number of singletons in the same parameter sets.
 
-# mapping to sam
-singularity run --app bwa0717 \
-/share/singularity/images/ccs/conda/amd-conda1-centos8.sinf \
-bwa sampe /scratch/frpe222/Genome/dmel-short-header.fa /scratch/frpe222/Trim/A0_trimed_1.sai /scratch/frpe222/Trim/A0_trimed_2.sai /scratch/frpe222/Trim/A0_trimed_1 /scratch/frpe222/Trim/A0_trimed_2 > /scratch/frpe222/Mapped/A0.sam
+The adjusted and strict parameter sets have similar results, which suggests that the seed length `-l` has a large impact in the alignment results. Perhaps this is also true for the number of gap opens `-o` but the independent effects would be hard to tease appart as a complete mapping of the combinations will be required and at the end the choice of parameters will still be arbitrary, alas based on comparison between results.
 
-# "bwa aln" specifies that the "aln" algorithm within the BWA software package should be used for read alignment.
-# "-t 8" specifies that the tool should use eight threads (i.e. eight CPU cores) for the alignment process, potentially speeding up the analysis if multiple cores are available.
-# "-o 2" specifies the maximum number of gap opens allowed in the alignment process. In this case, up to two gap opens are permitted.
-# "-d 12" specifies the maximum gap extension penalty that can be assigned in the alignment process.
-# "-e 12" specifies the maximum edit distance allowed between the read and the reference genome, in terms of the number of mismatches and gaps.
-# "-l 100" specifies the seed length used for the alignment process. In this case, a seed length of 100 base pairs is used.
-# "-n 0.01" specifies the maximum allowed mismatch rate between the read and the reference genome. In this case, a maximum mismatch rate of 0.01 (or 1%) is allowed.
-```
+For the moment, it seems appropiate te apply the **Adjusted** set.
 
 ### 4. SAM to BAM Conversion
 - **Script**: `scripts/04_sam_to_bam.sh`
