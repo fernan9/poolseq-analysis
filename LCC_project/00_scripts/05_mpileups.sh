@@ -9,14 +9,14 @@
 #SBATCH --mail-type ALL       
 #SBATCH --mail-user fr_perezgalvez@outlook.com  
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=10G  # Added memory request
+#SBATCH --mem=20G  # Added memory request
 
 module load ccs/singularity
 
 # Directories
 INPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/5_processed"
 CONTAINER="/share/singularity/images/ccs/ngsTools/samtools-1.13+matplotlib-bcftoools-1.13.sinf"
-OUTPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/6_mpileups"
+OUTPUT_DIR="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/6_pileups"
 GENOME="/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/0_genome/dmel_r6C.fasta"
 
 # Get sorted list of BAM files with and without 'P' in the name
@@ -32,16 +32,16 @@ MPILEUP_FILE_OUTBRED="$OUTPUT_DIR/ABCD.mpileup"
 
 echo "===== Starting MPileUp Inbred ===== at $(date)"
 
-singularity run --app samtools113 "$CONTAINER" samtools \
-    mpileup -B -q 20 -Q 20 -f "$GENOME" \
-    "${FILES_INBRED[@]}" > "$MPILEUP_FILE_INBRED"
+singularity run --app bcftools113 "$CONTAINER" bcftools \
+    mpileup -B -q 20 -Q 20 -f "$GENOME" --threads 8 \
+    "${FILES_INBRED[@]}" > "$MPILEUP_FILE_INBRED" || { echo "Inbred mpileup failed"; exit 1; }
 
 echo "===== Completed MPileUp Inbred ===== at $(date)"
 
 echo "===== Starting MPileUp Outbred ===== at $(date)"
 
-singularity run --app samtools113 "$CONTAINER" samtools \
-    mpileup -B -q 20 -Q 20 -f "$GENOME" \
-    "${FILES_OUTBRED[@]}" > "$MPILEUP_FILE_OUTBRED"
+singularity run --app bcftools113 "$CONTAINER" bcftools \
+    mpileup -B -q 20 -Q 20 -f "$GENOME" --threads 8 \
+    "${FILES_OUTBRED[@]}" > "$MPILEUP_FILE_OUTBRED" || { echo "Outbred mpileup failed"; exit 1; }
 
 echo "===== Completed MPileUp Outbred ===== at $(date)"

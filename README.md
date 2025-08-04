@@ -179,25 +179,80 @@ The sample run was B2a to create the SAM file.
 |Read Depth (Std Dev)|(106.188)|	(109.861) |  (110.21) |
 |SNPs called	    |	1,197,475  |	1,244,337 | 1,244,103 |
 
-One interesting observation is that the strict parameters calls a larger amount of SNPs as well as an increased mapping rate. One would expect that a permissive set of parameters would allow more SNPs to be read, but instead it appears that the contrary is true, perhaps by increasing ambiguity. This idea is reinforced by the increased amount of properly paired reads in strict and adjusted parameters while as well as the decreased number of singletons in the same parameter sets.
+One interesting observation is that the strict parameters calls a larger amount of SNPs as well as an increased mapping rate. One would expect that a permissive set of parameters would allow more SNPs to be read, but instead it appears that the contrary is true, perhaps by increasing ambiguity. This idea is reinforced by the increased amount of properly paired reads in strict and adjusted parameters as well as the decreased number of singletons in the same parameter sets.
 
 The adjusted and strict parameter sets have similar results, which suggests that the seed length `-l` has a large impact in the alignment results. Perhaps this is also true for the number of gap opens `-o` but the independent effects would be hard to tease appart as a complete mapping of the combinations will be required and at the end the choice of parameters will still be arbitrary, alas based on comparison between results.
 
 For the moment, it seems appropiate te apply the **Adjusted** set.
 
-### 4. SAM to BAM Conversion
-- **Script**: `scripts/04_sam_to_bam.sh`
+## 4. SAM to BAM Conversion, Sorting and Indexing
+- **Script**: `00_scripts/04_sam2bam_sort_index.sh`
 - **Input**: SAM files
-- **Output**: BAM files in `aligned/`
-- **Tools**: samtools view
+- **Output**: BAM files in `5_processed/`, depth and flagstat TXT files
+- **Tools**: samtools view, sort, index, flagstat, depth
 - **Parameters**: Default
 
-### 5. Sorting and Indexing
-- **Script**: `scripts/05_sort_index.sh`
-- **Input**: BAM files
-- **Output**: Sorted BAM files and indices in `sorted/`
-- **Tools**: samtools sort + index
-- **Parameters**: Default
+This script preprocesses the BAM files for variant calling. Statistics on the alingments is gathered by ``flagstat`` and ``depth`` in the corresponding text files.
+
+## 5. Naming and grouping BAMs for MPILEUPs
+
+The two experiment need to be analyzed independently and in different ways, on one side the inbred experiment does not have a clear way to compute the effective population size and maybe the differences between allele frequencies may be ahrd to intepret. That needs some time to be thought of.
+
+On the other hand, the outbred populations are more straightforward in their mode of analysis. Becuase we are going to make comparisons between the resequenced samples after exposure, we need to make also an estimation of effective population size to be used as a threshold for the putative loci under selection in the genome wide data.
+### Outbred population linages
+
+```bash
+|------10 weeks------|------10 weeks------|
+        ┌───(Hold)───> A1b ──(Control)────> A1a
+A0 ─────┤                                    : 
+        └───(Hold)───> A2b ──(Expriment)──> A2a
+```
+According to the experimental setup, there are going to be two comparisons to be made, one following the **time series samples** ``A0->A1b->A1a`` and the other between **endpoint samples** ``A1a...A2a``.
+
+Samples must be grouped in merged ``MPILUP`` files because:
+  1. Alleleic frequencies tables must match between samples for testing.
+  2. Information from all samples can be used to inform variant calling.
+
+### Time series samples MPILEUPs
+
+The three samples compiling each lineage must be merged as a single BAM and then as a single MPILEUP for later analysis in ``R``. To do this, we need to use the ``samtools merge`` command.
+
+```bash
+# 1. Add RG tags via merge
+samtools merge -r -h header.sam -o merged_withRG.bam sample1.bam sample2.bam
+```
+
+The header file header.sam must be created for each file in the follwing format. There should be a total of 8 files = {A, B, C, D} x {1,2}
+
+```bash
+@HD     VN:1.6    SO:coordinate
+@RG     ID:A0   SM:A0   LB:lib1    PL:SANGER
+@RG     ID:A1b  SM:A1b  LB:lib1    PL:SANGER
+@RG     ID:A1a  SM:A1a  LB:lib1    PL:SANGER
+```
+
+Once ready, the MPILUP files are created with the merged BAM files and later converted to the sync format needed for both Popoolation and R scripts.
+
+```bash
+# 2. Generate mpileup (now with proper SM names)
+samtools mpileup -B -q 20 -Q 20 -f dmel_r6C.fasta merged_withRG.bam > A1.mpileup
+
+# 3. Convert to sync (use Sanger encoding)
+perl mpileup2sync.pl --input A1.mpileup --output A1.sync --fastq-type sanger --min-qual 20
+```
+## Note equivalent code from submit-frpe31.sh
+
+
+
+# Next steps
+
+Pileups were created in combination for both experiment, but it seems that for the analysis part of the Ne with the R package it will be necessary to make mpileups of time series, that is A0-> A1b-> A1a. Also the vcf formats are missing allele count differences, the format is weird and the naming was made with the headers of the complete file path, these must be changed
+1. Change name of files
+2. Change vcf formats
+3. Create necessary file for populations ABCD
+#### NOTE. In the case of P16, there must be a different way to estimate effective population size, but maybe selection will not be possible to be estimated that way and its presence will be more like descriptive.
+
+
 
 ### 6. Pileup Generation
 - **Script**: `scripts/06_pileup.sh`

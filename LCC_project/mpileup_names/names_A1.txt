@@ -1,0 +1,3 @@
+A0	/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/5_processed/A0_H7MY2DSX5.bam
+A1b	/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/5_processed/A1b_H7MY2DSX5.bam
+A1a	/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/5_processed/A1a_H7MY2DSX5.bam
