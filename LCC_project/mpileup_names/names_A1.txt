@@ -1,3 +1,27 @@
-A0	/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/5_processed/A0_H7MY2DSX5.bam
-A1b	/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/5_processed/A1b_H7MY2DSX5.bam
-A1a	/mnt/gpfs2_4m/scratch/frpe222/poolseq_project/5_processed/A1a_H7MY2DSX5.bam
+A0_H7MY2DSX5.bam            B1a_H7MY2DSX5.flagstat.txt  C2a_H7MY2DSX5.depth.txt     P1_H7MY2DSX5.bam.bai
+A0_H7MY2DSX5.bam.bai        B1b_H7MY2DSX5.bam           C2a_H7MY2DSX5.flagstat.txt  P1_H7MY2DSX5.depth.txt
+A0_H7MY2DSX5.depth.txt      B1b_H7MY2DSX5.bam.bai       C2b_H7MY2DSX5.bam           P1_H7MY2DSX5.flagstat.txt
+A0_H7MY2DSX5.flagstat.txt   B1b_H7MY2DSX5.depth.txt     C2b_H7MY2DSX5.bam.bai       P2_H7MY2DSX5.bam
+A1a_H7MY2DSX5.bam           B1b_H7MY2DSX5.flagstat.txt  C2b_H7MY2DSX5.depth.txt     P2_H7MY2DSX5.bam.bai
+A1a_H7MY2DSX5.bam.bai       B2a_H7MY2DSX5.bam           C2b_H7MY2DSX5.flagstat.txt  P2_H7MY2DSX5.depth.txt
+A1a_H7MY2DSX5.depth.txt     B2a_H7MY2DSX5.bam.bai       D0_H7N25DSX5.bam            P2_H7MY2DSX5.flagstat.txt
+A1a_H7MY2DSX5.flagstat.txt  B2a_H7MY2DSX5.depth.txt     D0_H7N25DSX5.bam.bai        P3_H7MY2DSX5.bam
+A1b_H7MY2DSX5.bam           B2a_H7MY2DSX5.flagstat.txt  D0_H7N25DSX5.depth.txt      P3_H7MY2DSX5.bam.bai
+A1b_H7MY2DSX5.bam.bai       B2b_H7MY2DSX5.bam           D0_H7N25DSX5.flagstat.txt   P3_H7MY2DSX5.depth.txt
+A1b_H7MY2DSX5.depth.txt     B2b_H7MY2DSX5.bam.bai       D1a_H7MY2DSX5.bam           P3_H7MY2DSX5.flagstat.txt
+A1b_H7MY2DSX5.flagstat.txt  B2b_H7MY2DSX5.depth.txt     D1a_H7MY2DSX5.bam.bai       P4_H7MY2DSX5.bam
+A2a_H7MY2DSX5.bam           B2b_H7MY2DSX5.flagstat.txt  D1a_H7MY2DSX5.depth.txt     P4_H7MY2DSX5.bam.bai
+A2a_H7MY2DSX5.bam.bai       C0_H7MY2DSX5.bam            D1a_H7MY2DSX5.flagstat.txt  P4_H7MY2DSX5.depth.txt
+A2a_H7MY2DSX5.depth.txt     C0_H7MY2DSX5.bam.bai        D1b_H7MY2DSX5.bam           P4_H7MY2DSX5.flagstat.txt
+A2a_H7MY2DSX5.flagstat.txt  C0_H7MY2DSX5.depth.txt      D1b_H7MY2DSX5.bam.bai       P5_H7MY2DSX5.bam
+A2b_H7N25DSX5.bam           C0_H7MY2DSX5.flagstat.txt   D1b_H7MY2DSX5.depth.txt     P5_H7MY2DSX5.bam.bai
+A2b_H7N25DSX5.bam.bai       C1a_H7MY2DSX5.bam           D1b_H7MY2DSX5.flagstat.txt  P5_H7MY2DSX5.depth.txt
+A2b_H7N25DSX5.depth.txt     C1a_H7MY2DSX5.bam.bai       D2a_H7MY2DSX5.bam           P5_H7MY2DSX5.flagstat.txt
+A2b_H7N25DSX5.flagstat.txt  C1a_H7MY2DSX5.depth.txt     D2a_H7MY2DSX5.bam.bai       P6_H7MY2DSX5.bam
+B0_H7MY2DSX5.bam            C1a_H7MY2DSX5.flagstat.txt  D2a_H7MY2DSX5.depth.txt     P6_H7MY2DSX5.bam.bai
+B0_H7MY2DSX5.bam.bai        C1b_H7MY2DSX5.bam           D2a_H7MY2DSX5.flagstat.txt  P6_H7MY2DSX5.depth.txt
+B0_H7MY2DSX5.depth.txt      C1b_H7MY2DSX5.bam.bai       D2b_H7MY2DSX5.bam           P6_H7MY2DSX5.flagstat.txt
+B0_H7MY2DSX5.flagstat.txt   C1b_H7MY2DSX5.depth.txt     D2b_H7MY2DSX5.bam.bai       P6wr_H7MY2DSX5.bam
+B1a_H7MY2DSX5.bam           C1b_H7MY2DSX5.flagstat.txt  D2b_H7MY2DSX5.depth.txt     P6wr_H7MY2DSX5.bam.bai
+B1a_H7MY2DSX5.bam.bai       C2a_H7MY2DSX5.bam           D2b_H7MY2DSX5.flagstat.txt  P6wr_H7MY2DSX5.depth.txt
+B1a_H7MY2DSX5.depth.txt     C2a_H7MY2DSX5.bam.bai       P1_H7MY2DSX5.bam            P6wr_H7MY2DSX5.flagstat.txt

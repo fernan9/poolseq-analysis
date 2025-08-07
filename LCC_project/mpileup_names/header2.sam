@@ -1,0 +1,4 @@
+@HD	VN:1.6	SO:coordinate
+@RG	ID:A0	SM:A0	LB:lib2	PL:SANGER
+@RG	ID:A2b	SM:A2b	LB:lib2	PL:SANGER
+@RG	ID:A2a	SM:A2a	LB:lib2	PL:SANGER

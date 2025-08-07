@@ -195,11 +195,43 @@ For the moment, it seems appropiate te apply the **Adjusted** set.
 This script preprocesses the BAM files for variant calling. Statistics on the alingments is gathered by ``flagstat`` and ``depth`` in the corresponding text files.
 
 ## 5. Naming and grouping BAMs for MPILEUPs
+- **Script**: `00_scripts/05_merge_bams.sh`
+              `00_scripts/05_ABCD_mpileups.sh`
+              `00_scripts/05_P16_mpileups.sh`              
+- **Input**: Sorted BAM files
+- **Output**: Merged BAM files by lineage (8) and final points (2)
+- **Tools**: samtools merge
 
-The two experiment need to be analyzed independently and in different ways, on one side the inbred experiment does not have a clear way to compute the effective population size and maybe the differences between allele frequencies may be ahrd to intepret. That needs some time to be thought of.
+The two experiments need to be analyzed independently and in different ways, on one side the **inbred populations experiment** does not have a clear way to compute the effective population size and maybe the differences between allele frequencies may be hard to intepret, a genewise analysis may be more appropiate.
 
-On the other hand, the outbred populations are more straightforward in their mode of analysis. Becuase we are going to make comparisons between the resequenced samples after exposure, we need to make also an estimation of effective population size to be used as a threshold for the putative loci under selection in the genome wide data.
+Either way, samples must be grouped in merged ``MPILEUP`` files accordingly to their experimental setup because:
+  1. Alleleic frequencies tables must match between samples for testing.
+  2. Information from all samples can be used to inform variant calling.
+
+### Inbred population lineages
+
+This experiment has a single founding population ``P0`` that was separated into 6 demes ``P1-6``, each held to stability for 20 weeks in continous culture. Then, three were randomly selected to be applied the treatment for 10 weeks, following that the samples were collected.
+
+```bash
+|------20 weeks-----|------10 weeks------|
+        ┌──(Hold)───> p1 ──(Control)─────> P1
+        |                                  ::
+        ├──(Hold)───> p2 ──(Experiment)──> P2
+        |                                  ::
+        ├──(Hold)───> p3 ──(Control)─────> P3
+P0 ─────┤                                  ::
+        ├──(Hold)───> p4 ──(Control)─────> P4
+        |                                  ::
+        ├──(Hold)───> p5 ──(Experiment)──> P5
+        |                                  ::
+        └──(Hold)───> p6 ──(Experiment)──> P6
+```
+
+These final samples are to be compared, so they must belong to the same mpilup file. 
+
 ### Outbred population linages
+
+On the other hand, the **outbred populations** are more nuanced in their mode of analysis. Becuase we are going to make comparisons between the resequenced samples after exposure, we need to make also an estimation of effective population size to be used as a threshold for the putative loci under selection in the genome wide data.
 
 ```bash
 |------10 weeks------|------10 weeks------|
@@ -209,11 +241,9 @@ A0 ─────┤                                    :
 ```
 According to the experimental setup, there are going to be two comparisons to be made, one following the **time series samples** ``A0->A1b->A1a`` and the other between **endpoint samples** ``A1a...A2a``.
 
-Samples must be grouped in merged ``MPILUP`` files because:
-  1. Alleleic frequencies tables must match between samples for testing.
-  2. Information from all samples can be used to inform variant calling.
 
-### Time series samples MPILEUPs
+
+### Time series samples (05_merge_bams.sh & 05_merge_pileup_sync.sh)
 
 The three samples compiling each lineage must be merged as a single BAM and then as a single MPILEUP for later analysis in ``R``. To do this, we need to use the ``samtools merge`` command.
 
@@ -231,7 +261,7 @@ The header file header.sam must be created for each file in the follwing format.
 @RG     ID:A1a  SM:A1a  LB:lib1    PL:SANGER
 ```
 
-Once ready, the MPILUP files are created with the merged BAM files and later converted to the sync format needed for both Popoolation and R scripts.
+Once ready, the ``MPILEUP`` files are created with the merged BAM files and later converted to the sync format needed for both Popoolation and R scripts.
 
 ```bash
 # 2. Generate mpileup (now with proper SM names)
@@ -240,18 +270,21 @@ samtools mpileup -B -q 20 -Q 20 -f dmel_r6C.fasta merged_withRG.bam > A1.mpileup
 # 3. Convert to sync (use Sanger encoding)
 perl mpileup2sync.pl --input A1.mpileup --output A1.sync --fastq-type sanger --min-qual 20
 ```
-## Note equivalent code from submit-frpe31.sh
-
-
+### Note equivalent code from submit-frpe31.sh
 
 # Next steps
 
 Pileups were created in combination for both experiment, but it seems that for the analysis part of the Ne with the R package it will be necessary to make mpileups of time series, that is A0-> A1b-> A1a. Also the vcf formats are missing allele count differences, the format is weird and the naming was made with the headers of the complete file path, these must be changed
-1. Change name of files
-2. Change vcf formats
-3. Create necessary file for populations ABCD
-#### NOTE. In the case of P16, there must be a different way to estimate effective population size, but maybe selection will not be possible to be estimated that way and its presence will be more like descriptive.
 
+1. Change name of files ABCD --- DONE
+2. Name and merge P16 --- DONE
+3. Create mpilups sync for populations ABCD
+
+## 8.6.2025
+There is a problem with the mpileup2sync from the merged BAM sfiles. The scripts generates a file but exists the loop without showing any information from the java execution. 
+1. Check if sync file can be processed in the next steps
+2. This may be a problem of the loops, make mpileups before sync
+3. Also, may be a problem or merged files, test normal pileups for sync
 
 
 ### 6. Pileup Generation
